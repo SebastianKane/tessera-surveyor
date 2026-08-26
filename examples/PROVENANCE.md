@@ -21,10 +21,6 @@ Each gallery image pairs the source photograph (top) with the
 surveyor's reconstruction rendered purely from its own data file
 (bottom). Source photographs:
 
-**gallery-stag-hunt-pella.jpg** — Stag Hunt mosaic (pebble mosaic), Pella, Macedonia, c. 300 BC.
-- Source: https://commons.wikimedia.org/wiki/File:Stag_hunt_mosaic,_Pella.jpg
-- License: Public domain
-
 **gallery-google-art.jpg** — Roman floor mosaic (Google Art Project).
 - Source: https://commons.wikimedia.org/wiki/File:Mosaic_-_Google_Art_Project.jpg
 - License: Public domain

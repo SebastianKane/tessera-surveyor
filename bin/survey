@@ -51,6 +51,13 @@ ap.add_argument("--join", action="store_true",
                      "agree). Opt-in because color alone cannot tell a "
                      "healed split from two same-colored touching stones "
                      "— judge the result with your eyes, per floor")
+ap.add_argument("--fuse", action="store_true",
+                help="fused survey: cellpose claims the regions where it "
+                     "demonstrably works (bright, well-jointed tesserae), "
+                     "the mold covers the rest. Needs cellpose installed; "
+                     "refuses loudly without it")
+ap.add_argument("--gpu", action="store_true",
+                help="with --fuse: run cellpose on the GPU")
 ap.add_argument("--tile", action="store_true",
                 help="tiled survey at native resolution: local grout and "
                      "wall calibration per 1024px core + 128px margin; "
@@ -62,7 +69,13 @@ if not os.path.exists(a.photo):
     sys.exit(f"survey: no such file: {a.photo}")
 out = a.out or os.path.splitext(a.photo)[0]
 crop = tuple(float(v) for v in a.crop.split(",")) if a.crop else None
-if a.tile:
+if a.fuse:
+    from fuse import digitize_fused  # noqa: E402
+    digitize_fused(a.photo, out, crop_frac=crop, max_side=a.max_side,
+                   stone_px=a.stone_px, min_stone_px=a.min_stone_px,
+                   min_solidity=a.min_solidity, rounds=a.rounds,
+                   source_note=a.note, gpu=a.gpu)
+elif a.tile:
     digitize_tiled(a.photo, out, stone_px=(18 if a.stone_px == 16
                                            else a.stone_px),
                    min_stone_px=a.min_stone_px,

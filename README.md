@@ -167,7 +167,7 @@ Known limitations — is what the first three items below break through:)
 
 ## Gallery
 
-Seven more floors — Pella pebble work through a Tiberias synagogue
+More floors — a Roman partridge through a Tiberias synagogue
 segment, plus the Alexander Mosaic with its damage-tiling failure visible
 — in [examples/GALLERY.md](examples/GALLERY.md), with sources and
 licenses in [examples/PROVENANCE.md](examples/PROVENANCE.md).

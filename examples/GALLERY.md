@@ -24,13 +24,6 @@ lacuna limitation from the README, kept here on purpose.
 
 ![Alexander](alexander-proof.jpg)
 
-## Stag Hunt, Pella (pebble mosaic, c. 300 BC)
-
-13,253 stones. A different tradition — natural pebbles, not cut tesserae —
-and the same value-blind growth reads it.
-
-![Stag Hunt](gallery-stag-hunt-pella.jpg)
-
 ## Floor mosaic (Google Art Project)
 
 32,750 stones.
