@@ -65,6 +65,14 @@ Four files come out:
 --min-solidity F     merge gate threshold (0.55)
 --max-side N         longest analyzed side (2200)
 --note TEXT          provenance note carried into the output
+--fuse               EXPERIMENTAL fused survey: a cell-segmentation model
+                     (cellpose, installed separately) claims the stones it
+                     is sure of — bright, well-jointed tesserae are its
+                     home ground — and the mold fills every silence. Each
+                     stone carries a "source" tag. Evaluation runs at half
+                     scale (measured: the model's claims densify when
+                     tesserae are ~8-9px in its view). Requires
+                     `pip install cellpose`; refuses loudly without it.
 ```
 
 ## The data

@@ -23,8 +23,11 @@ from scipy import ndimage as ndi
 
 from digitize import digitize, render_svg, trace_boundary
 
-WIN = 768          # coverage-gate window
-COVER_GATE = 0.50  # model claims a window when its stones cover this much
+WIN = 768          # evaluation window (analysis scale)
+EVAL_SCALE = 0.5   # the model's claims densify when tesserae are ~8-9px
+                   # in ITS view — measured on a scale ladder, peak at 0.5
+SPARSE_R = 3.0     # a claim with few claimed neighbors (within this many
+                   # stone diameters) is flagged sparse_claim, never dropped
 
 
 def digitize_fused(path, out_prefix, crop_frac=None, max_side=2200,
@@ -64,19 +67,50 @@ def digitize_fused(path, out_prefix, crop_frac=None, max_side=2200,
     print("fuse: cellpose pass "
           f"({'gpu' if gpu else 'cpu'}) ...", flush=True)
     model = models.CellposeModel(gpu=gpu)
-    out = model.eval(np.asarray(im), diameter=stone_px)
-    masks = np.asarray(out[0]).astype(np.int64)
-
-    # THE GATE: the model claims a window only where it demonstrably
-    # worked — dense stones found. Elsewhere its silence is respected.
-    accept = np.zeros((H, W), bool)
+    # the recipe that works, measured: 768px crops fed as a batched LIST,
+    # each DOWNSCALED to EVAL_SCALE before evaluation (the model's claims
+    # densify when tesserae are ~8-9px in its view — 0.5x tripled coverage
+    # over 1x on the same crop), masks upsampled back by nearest-neighbor.
+    # No window gate and no coverage veto: this model's failure mode is
+    # SILENCE, not confabulation — it claims only what it is sure of, so
+    # every claim is kept and every silence is the mold's to fill.
+    MARGIN = 64
+    arr = np.asarray(im)
+    crops, boxes = [], []
     for y0 in range(0, H, WIN):
         for x0 in range(0, W, WIN):
-            w = masks[y0:y0 + WIN, x0:x0 + WIN]
-            if w.size and (w > 0).mean() >= COVER_GATE:
-                accept[y0:y0 + WIN, x0:x0 + WIN] = True
-    kept = np.where(accept, masks, 0)
-    n_cp = int(kept.max())
+            ty0, tx0 = max(0, y0 - MARGIN), max(0, x0 - MARGIN)
+            ty1 = min(H, y0 + WIN + MARGIN)
+            tx1 = min(W, x0 + WIN + MARGIN)
+            ch, cw = ty1 - ty0, tx1 - tx0
+            crop = Image.fromarray(arr[ty0:ty1, tx0:tx1]).resize(
+                (max(1, int(cw * EVAL_SCALE)),
+                 max(1, int(ch * EVAL_SCALE))), Image.LANCZOS)
+            crops.append(np.asarray(crop))
+            boxes.append((tx0, ty0, x0, y0,
+                          min(W, x0 + WIN), min(H, y0 + WIN), cw, ch))
+    out = model.eval(crops)
+    masks_list = out[0] if isinstance(out, (tuple, list)) else out
+
+    # stitch: masks back to analysis scale, each window keeping only the
+    # stones whose centroid lands in its core (seams dedupe themselves,
+    # as in the tiled survey)
+    kept = np.zeros((H, W), np.int64)
+    n_cp = 0
+    for mk, (tx0, ty0, cx0, cy0, cx1, cy1, cw, ch) in zip(masks_list, boxes):
+        mk = np.asarray(
+            Image.fromarray(np.asarray(mk).astype(np.int32), mode="I")
+            .resize((cw, ch), Image.NEAREST)).astype(np.int64)
+        for lb in range(1, int(mk.max()) + 1):
+            ys_, xs_ = np.nonzero(mk == lb)
+            if len(ys_) == 0:
+                continue
+            my, mx = ys_.mean() + ty0, xs_.mean() + tx0
+            if not (cy0 <= my < cy1 and cx0 <= mx < cx1):
+                continue
+            n_cp += 1
+            kept[ys_ + ty0, xs_ + tx0] = n_cp
+    accept = kept > 0
 
     # ONE LABEL MAP: accepted model stones claim their pixels; the mold
     # keeps everything else. Mold cells that lose most of their body to
@@ -148,7 +182,7 @@ def digitize_fused(path, out_prefix, crop_frac=None, max_side=2200,
             "crop_frac": list(crop_frac) if crop_frac else None,
             "grout_rgb": tess_mold["grout_rgb"],
             "coverage": round(float(((kept > 0) | (lab > 0)).mean()), 3),
-            "model_claimed": round(float(accept.mean()), 3),
+            "model_claimed": round(float((kept > 0).mean()), 3),
             "n_model_stones": n_model, "n_mold_stones": n_mold,
             "merged_flagged": tess_mold["merged_flagged"],
             "joined": 0,
