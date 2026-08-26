@@ -192,3 +192,51 @@ def test_tiled_matches_truth_across_seams(tmp_path):
         d2 = ((cents - cents[i]) ** 2).sum(1)
         d2[i] = 1e9
         assert d2.min() > (STONE / 2) ** 2, "two stones share a centroid — seam duplicate"
+
+
+def test_cell_join_heals_ridge_splits(tmp_path):
+    """A stone with an internal ridge — a vein or shadowed crack, darker
+    than the stone but nothing like grout — must be measured as ONE stone:
+    the seam between its split cells is not grout-colored, so the join
+    heals it. Control stones without ridges must be unaffected, and the
+    true grout seams between all stones must keep them separate."""
+    photo = str(tmp_path / "ridged.png")
+    im = Image.new("RGB", (COLS * PITCH + 8, ROWS * PITCH + 8), GROUT)
+    dr = ImageDraw.Draw(im)
+    n_ridged = 0
+    for j in range(ROWS):
+        for i in range(COLS):
+            base = [(200, 60, 50), (60, 120, 180), (220, 200, 160),
+                    (40, 40, 50)][(i + j) % 4]
+            x, y = 8 + i * PITCH, 8 + j * PITCH
+            dr.rectangle([x, y, x + STONE - 1, y + STONE - 1], fill=base)
+            if (i + j) % 3 == 0:
+                # an internal ridge: same hue, darker — NOT grout
+                ridge = tuple(int(v * 0.55) for v in base)
+                dr.line([x + 2, y + STONE // 2, x + STONE - 3,
+                         y + STONE // 2], fill=ridge, width=2)
+                n_ridged += 1
+    im.save(photo)
+    tess = digitize(photo, str(tmp_path / "ridged"), stone_px=STONE,
+                    max_side=4000)
+    real = [s for s in tess["stones"]
+            if not s["near_grout"] and "merged" not in s["flags"]]
+    total = COLS * ROWS
+    assert tess["joined"] > 0, "no joins fired on ridge-split stones"
+    assert abs(len(real) - total) <= total * 0.08, (
+        f"drew {total} stones ({n_ridged} with internal ridges), "
+        f"measured {len(real)} after {tess['joined']} joins")
+
+
+def test_join_respects_true_grout(tmp_path):
+    """The join must never fuse across REAL grout: the plain floor's count
+    must be identical with the join on and off."""
+    photo = str(tmp_path / "plain.png")
+    draw_floor(photo)
+    a = digitize(photo, str(tmp_path / "j1"), stone_px=STONE, max_side=4000,
+                 join=True)
+    b = digitize(photo, str(tmp_path / "j0"), stone_px=STONE, max_side=4000,
+                 join=False)
+    assert a["joined"] == 0, (
+        f"{a['joined']} joins fired across genuine grout seams")
+    assert a["n_stones"] == b["n_stones"]

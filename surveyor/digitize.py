@@ -58,7 +58,7 @@ FORMAT = "tessera-surveyor/1"
 
 def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
              min_stone_px=25, min_solidity=0.5, rounds=40, render=True,
-             source_note=""):
+             source_note="", join=True):
     im = Image.open(path).convert("RGB")
     if crop_frac:
         fx0, fy0, fx1, fy1 = crop_frac
@@ -115,6 +115,64 @@ def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
     dist, (iy, ix) = ndi.distance_transform_edt(lab == 0, return_indices=True)
     fill = (lab == 0) & (dist <= close_px)
     lab[fill] = lab[iy[fill], ix[fill]]
+
+    # THE CELL JOIN (Sebastian's rule, 08-26): the mold over-segments full
+    # stones along their internal ridges — a shadowed crack or a vein in
+    # the mineral reads as a wall. But a REAL wall has grout in it. So:
+    # two adjacent cells are one stone if (a) the photograph's color along
+    # their shared seam does NOT fall in the grout color range — no grout
+    # ran there — and (b) their own colors agree, because the parts of one
+    # over-split stone share its color while genuinely distinct neighbors
+    # do not. Distinct stones touching with sub-pixel grout fail (b) and
+    # stay separate, in the merge-flag family where they belong.
+    if join:
+        gpix = rgb[lab1 == 0]
+        if len(gpix) > 100:
+            gmed = np.median(gpix, axis=0)
+            gtol = max(18.0, 2.0 * float(
+                np.median(np.abs(gpix - gmed).max(axis=1))))
+        else:
+            gmed, gtol = np.asarray(grout_color, float), 24.0
+        # seam samples between adjacent closed cells
+        pairs = {}
+        for (sa, sb) in ((lab[:, :-1], lab[:, 1:]), (lab[:-1, :], lab[1:, :])):
+            m = (sa != sb) & (sa > 0) & (sb > 0)
+            ys_, xs_ = np.nonzero(m)
+            aa, bb = sa[m], sb[m]
+            lo = np.minimum(aa, bb); hi = np.maximum(aa, bb)
+            for y_, x_, l_, h_ in zip(ys_, xs_, lo, hi):
+                pairs.setdefault((int(l_), int(h_)), []).append((y_, x_))
+        parent = list(range(n + 2))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        joined = 0
+        for (a, b), px_list in pairs.items():
+            if len(px_list) < 4:
+                continue
+            ys_ = np.array([p[0] for p in px_list])
+            xs_ = np.array([p[1] for p in px_list])
+            seam_med = np.median(smooth[ys_, xs_], axis=0)
+            seam_is_grout = np.abs(seam_med - gmed).max() <= gtol
+            colors_agree = np.abs(ref[a] - ref[b]).max() <= max(
+                24.0, min(tau[a], tau[b]))
+            if not seam_is_grout and colors_agree:
+                ra, rb = find(a), find(b)
+                if ra != rb:
+                    parent[rb] = ra
+                    joined += 1
+        if joined:
+            remap = np.arange(n + 2)
+            for k in range(1, n + 1):
+                remap[k] = find(k)
+            lab = remap[lab]
+            lab1 = remap[lab1]
+    else:
+        joined = 0
 
     # measure every stone
     stones, merged = [], 0
@@ -186,7 +244,7 @@ def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
             "crop_frac": list(crop_frac) if crop_frac else None,
             "grout_rgb": gc,
             "coverage": round(float((lab > 0).sum() / lab.size), 3),
-            "merged_flagged": merged,
+            "merged_flagged": merged, "joined": joined,
             "n_stones": len(stones), "stones": stones}
     with open(out_prefix + ".stones.json", "w") as f:
         json.dump(tess, f)
@@ -212,7 +270,8 @@ def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
     outp[seam] = gc
     Image.fromarray(outp.astype(np.uint8)).save(out_prefix + "-pixels.png")
     print(f"{os.path.basename(path)}: {len(stones)} stones grown "
-          f"(coverage {tess['coverage']:.0%}, {merged} merges flagged) -> {out_prefix}.stones.json")
+          f"({joined} ridge-splits joined, {merged} merges flagged, "
+          f"coverage {tess['coverage']:.0%}) -> {out_prefix}.stones.json")
     return tess
 
 if __name__ == "__main__":
@@ -244,7 +303,7 @@ def render_svg(tess):
 
 def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
                    min_stone_px=25, min_solidity=0.5, rounds=40,
-                   source_note=""):
+                   source_note="", join=True):
     """Tiled survey at native resolution — accuracy through local
     calibration. One global grout threshold across a large photograph is
     a compromise: lighting drifts, and the 82nd percentile of the whole
@@ -261,7 +320,7 @@ def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
     tdir = tempfile.mkdtemp(prefix=".tiles-",
                             dir=os.path.dirname(os.path.abspath(out_prefix))
                             or ".")
-    stones, grout_votes, merged_total, tiles = [], [], 0, 0
+    stones, grout_votes, merged_total, joined_total, tiles = [], [], 0, 0, 0
     try:
         for y0 in range(0, H, core):
             for x0 in range(0, W, core):
@@ -284,11 +343,12 @@ def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
                                 max_side=10 ** 9, stone_px=stone_px,
                                 min_stone_px=min_stone_px,
                                 min_solidity=min_solidity, rounds=rounds,
-                                render=False)
+                                render=False, join=join)
                 os.remove(tp)
                 tiles += 1
                 grout_votes.append(tess["grout_rgb"])
                 merged_total += tess["merged_flagged"]
+                joined_total += tess.get("joined", 0)
                 cx1, cy1 = min(W, x0 + core), min(H, y0 + core)
                 for s in tess["stones"]:
                     xs = [p[0] for p in s["poly"]]
@@ -311,7 +371,7 @@ def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
             "analyzed_w": W, "analyzed_h": H, "crop_frac": None,
             "grout_rgb": gc, "coverage": 1.0,
             "tiling": {"core": core, "margin": margin, "tiles": tiles},
-            "merged_flagged": merged_total,
+            "merged_flagged": merged_total, "joined": joined_total,
             "n_stones": len(stones), "stones": stones}
     with open(out_prefix + ".stones.json", "w") as f:
         json.dump(tess, f)
@@ -319,6 +379,6 @@ def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
         f.write(render_svg(tess))
     im.save(out_prefix + "-photo.png")
     print(f"{os.path.basename(path)}: {len(stones)} stones grown in "
-          f"{tiles} tiles ({merged_total} merges flagged) "
-          f"-> {out_prefix}.stones.json")
+          f"{tiles} tiles ({joined_total} ridge-splits joined, "
+          f"{merged_total} merges flagged) -> {out_prefix}.stones.json")
     return tess
