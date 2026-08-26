@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""survey — digitize a photograph of a real mosaic into per-stone data.
+
+Usage:
+  survey PHOTO [-o PREFIX] [--crop X0,Y0,X1,Y1] [--stone-px N]
+         [--min-stone-px N] [--min-solidity F] [--max-side N]
+         [--note TEXT]
+
+Writes three files:
+  PREFIX.stones.json   every stone: boundary polygon, mean color, area,
+                       aspect, orientation — plus the grout color and an
+                       honest count of merges detected and excluded
+  PREFIX-digital.svg   the floor re-rendered from the data alone (the proof)
+  PREFIX-photo.png     the analyzed photograph, cropped/scaled as measured
+"""
+import argparse
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "surveyor"))
+from digitize import digitize  # noqa: E402
+
+ap = argparse.ArgumentParser(
+    prog="survey", description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter)
+ap.add_argument("photo", help="photograph of a mosaic floor")
+ap.add_argument("-o", "--out",
+                help="output prefix (default: photo name without extension)")
+ap.add_argument("--crop", help="X0,Y0,X1,Y1 as fractions, applied first at "
+                               "native resolution")
+ap.add_argument("--stone-px", type=int, default=16,
+                help="expected stone diameter in analyzed pixels (default 16)")
+ap.add_argument("--min-stone-px", type=int, default=30,
+                help="area floor in pixels (default 30)")
+ap.add_argument("--min-solidity", type=float, default=0.55,
+                help="below this, a region is flagged as a merge of "
+                     "neighbours and excluded (default 0.55)")
+ap.add_argument("--max-side", type=int, default=2200,
+                help="longest analyzed side (default 2200)")
+ap.add_argument("--note", default="",
+                help="free-text provenance note stored in the output")
+a = ap.parse_args()
+
+if not os.path.exists(a.photo):
+    sys.exit(f"survey: no such file: {a.photo}")
+out = a.out or os.path.splitext(a.photo)[0]
+crop = tuple(float(v) for v in a.crop.split(",")) if a.crop else None
+digitize(a.photo, out, crop_frac=crop, max_side=a.max_side,
+         stone_px=a.stone_px, min_stone_px=a.min_stone_px,
+         min_solidity=a.min_solidity, source_note=a.note)

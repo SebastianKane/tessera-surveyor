@@ -1,0 +1,5 @@
+*.pyc
+__pycache__/
+*.stones.json
+*-digital.svg
+*-photo.png
