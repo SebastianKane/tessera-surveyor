@@ -3,7 +3,7 @@
 
 Usage:
   survey PHOTO [-o PREFIX] [--crop X0,Y0,X1,Y1] [--stone-px N]
-         [--min-stone-px N] [--min-solidity F] [--max-side N]
+         [--min-stone-px N] [--min-solidity F] [--max-side N] [--rounds N]
          [--note TEXT]
 
 Writes three files:
@@ -12,6 +12,9 @@ Writes three files:
                        honest count of merges detected and excluded
   PREFIX-digital.svg   the floor re-rendered from the data alone (the proof)
   PREFIX-photo.png     the analyzed photograph, cropped/scaled as measured
+  PREFIX-pixels.png    the pixel-true render: every stone keeps its actual
+                       photograph pixels and only the grout is replaced —
+                       digitization as grout removal
 """
 import argparse
 import os
@@ -36,6 +39,8 @@ ap.add_argument("--min-stone-px", type=int, default=30,
 ap.add_argument("--min-solidity", type=float, default=0.55,
                 help="below this, a region is flagged as a merge of "
                      "neighbours and excluded (default 0.55)")
+ap.add_argument("--rounds", type=int, default=40,
+                help="growth rounds; each adds one pixel ring (default 40)")
 ap.add_argument("--max-side", type=int, default=2200,
                 help="longest analyzed side (default 2200)")
 ap.add_argument("--note", default="",
@@ -48,4 +53,4 @@ out = a.out or os.path.splitext(a.photo)[0]
 crop = tuple(float(v) for v in a.crop.split(",")) if a.crop else None
 digitize(a.photo, out, crop_frac=crop, max_side=a.max_side,
          stone_px=a.stone_px, min_stone_px=a.min_stone_px,
-         min_solidity=a.min_solidity, source_note=a.note)
+         min_solidity=a.min_solidity, rounds=a.rounds, source_note=a.note)

@@ -60,7 +60,7 @@ def test_finds_the_stones_it_was_shown(surveyed):
     they carry the near_grout flag — so the STONE count is the count of
     unflagged regions, and that must match what was drawn."""
     truth, tess, _ = surveyed
-    real = [s for s in tess["stones"] if not s["near_grout"]]
+    real = [s for s in tess["stones"] if not s["near_grout"] and "merged" not in s["flags"]]
     assert abs(len(real) - len(truth)) <= len(truth) * 0.05, (
         f"drew {len(truth)} stones, measured {len(real)} unflagged")
     flagged = tess["n_stones"] - len(real)
@@ -138,7 +138,8 @@ def test_proof_render_is_wellformed_and_complete(surveyed):
     svg = render_svg(tess)
     root = ET.fromstring(svg)
     paths = [e for e in root.iter() if e.tag.endswith("path")]
-    assert len(paths) == tess["n_stones"]
+    unmerged = [s for s in tess["stones"] if "merged" not in s["flags"]]
+    assert len(paths) == len(unmerged)
 
 
 def test_cli_end_to_end(surveyed, tmp_path):

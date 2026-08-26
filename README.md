@@ -12,18 +12,30 @@ own eyes whether the data says the floor.
 ![Alexander Mosaic, photograph and reconstruction](examples/alexander-proof.jpg)
 
 *The Alexander Mosaic (detail), House of the Faun, Pompeii — photograph
-(public domain, via Wikimedia Commons) above, and below it the same floor
-re-rendered purely from its `.stones.json`: 7,526 stones measured, 1,206
-merged regions detected and excluded.*
+(public domain, via Wikimedia Commons) at top; the same floor re-rendered
+purely from its `.stones.json` in the middle (18,387 stones, 100%
+coverage); and at bottom the pixel-true render — every stone keeps its
+actual photograph pixels and only the grout is replaced.*
 
-## Why classic CV, no learning
+## The algorithm: slime-mold the stones
 
-Everything here is gradient fields, watershed, and convex hulls — numpy,
-scipy, and Pillow, nothing to download, nothing to fine-tune, and every
-result reproducible to the byte. Brightness thresholds fail on dark stones
-(they read as grout), so segmentation is by **homogeneity**: stones of any
-value are smooth basins in the color-gradient field, and grout lines are
-the ridges between them.
+Everything here is numpy, scipy, and Pillow — nothing to download, nothing
+to fine-tune, every result reproducible to the byte.
+
+1. **Locate** each stone at the minima of the color-gradient field
+   (brightness thresholds are half-blind — dark stones read as grout —
+   so the field is value-blind by construction).
+2. **Grow** every stone outward simultaneously, one pixel ring per round,
+   absorbing neighbors while the color delta stays under the stone's own
+   adaptive wall; the moment it hits grout, that's the edge. A pale stone
+   beside pale grout gets a tighter wall than a black stone ever needs.
+   No overlap is possible: every pixel is claimed at most once.
+3. **Close**: each stone then expands uniformly until it meets its
+   neighbor, so the seam falls on the medial line where the grout ran —
+   capped, so real lacunae stay open instead of growing lies. Colors are
+   measured on the color-true extent from before closure.
+4. **Trace** each stone's actual outline (Moore-neighbor boundary, CCW),
+   not a convex hull: the polygon in the data is the shape in the floor.
 
 ## Install and run
 
@@ -33,11 +45,13 @@ bin/survey examples/alexander-detail.jpg -o alexander --crop 0.15,0.10,0.85,0.55
 pytest tests/ -v
 ```
 
-Three files come out:
+Four files come out:
 
     alexander.stones.json   the floor as data (schema below)
     alexander-digital.svg   the proof: re-rendered from the data alone
     alexander-photo.png     the analyzed image, as measured
+    alexander-pixels.png    the pixel-true render: stones keep their real
+                            pixels, only the grout is replaced
 
 ### Options
 
@@ -55,31 +69,39 @@ Three files come out:
 
 ```json
 {
-  "format": "tessera-surveyor/0",
+  "format": "tessera-surveyor/1",
+  "method": "slime-mold",
   "grout_rgb": [168, 148, 122],
-  "merged_flagged": 1206,
-  "n_stones": 7526,
+  "coverage": 1.0,
+  "merged_flagged": 22,
+  "n_stones": 18387,
   "stones": [
     {"poly": [[x, y], ...], "rgb": [r, g, b], "area_px": 214,
-     "aspect": 1.41, "angle_deg": 63.5, "near_grout": false}
+     "wall": 38.5, "near_grout": false, "flags": [],
+     "aspect": 1.41, "angle_deg": 63.5}
   ]
 }
 ```
+
+`poly` is the stone's traced outline in analyzed-image coordinates, wound
+counter-clockwise. `wall` is the color-delta tolerance the stone grew
+with; a cramped wall (`near_grout: true`) marks stones that sat close to
+the grout color and may be over-split.
 
 ## Honesty as a design rule
 
 A measuring tool must not be confidently wrong, so the failure modes are
 surfaced instead of smoothed over:
 
-- **Merges are counted, never kept.** Stones fused by sub-pixel grout show
-  as one region whose convex hull dwarfs its pixel count; the solidity gate
-  detects them, reports the count in `merged_flagged`, and excludes them.
-- **Grout-colored regions are flagged, never dropped.** A region whose
-  color sits at the measured grout color is probably a joint fragment — but
-  real floors do lay stones in grout-colored minerals, so it carries a
-  `near_grout` flag and the choice stays with the consumer.
-- **Pale-on-pale is unreliable** at modest resolution, and the output says
-  so in its own `method` field.
+- **Flags, never deletions.** A region whose hull dwarfs its pixel count
+  is a merge of neighbors; a stone that grew with a cramped wall sat near
+  the grout color and may be over-split; a zero-area trace is degenerate.
+  All three are flagged in the record (`merged`, `near_grout`,
+  `degenerate`) and the record stays — consumers choose by flag, the data
+  never quietly loses a stone.
+- **Lacunae stay open.** The closure step is capped, so a genuinely
+  missing patch of floor stays unclaimed instead of being papered over
+  by confident neighbors.
 - The test suite includes a **ground-truth floor**: a synthetic tessellation
   with a known answer, against which count, color, geometry, and determinism
   are all checked. A tool that measures must be measured.
