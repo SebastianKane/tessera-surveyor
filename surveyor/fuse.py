@@ -110,6 +110,17 @@ def digitize_fused(path, out_prefix, crop_frac=None, max_side=2200,
                 continue
             n_cp += 1
             kept[ys_ + ty0, xs_ + tx0] = n_cp
+    # rare confabulation gate, applied BEFORE the mold cedes territory:
+    # the model's mistakes are GIANT (a whole eye claimed as one stone),
+    # and a dropped giant must leave its ground to the mold's cells, not
+    # a hole in the floor
+    max_stone = int((3.5 * stone_px) ** 2)
+    sizes = np.bincount(kept.ravel())
+    giants = np.nonzero(sizes > max_stone)[0]
+    giants = giants[giants > 0]
+    if len(giants):
+        kept[np.isin(kept, giants)] = 0
+    dropped_giant = [int(len(giants))]
     accept = kept > 0
 
     # ONE LABEL MAP: accepted model stones claim their pixels; the mold
@@ -140,6 +151,7 @@ def digitize_fused(path, out_prefix, crop_frac=None, max_side=2200,
             a = int(m.sum())
             if a < min_px:
                 continue
+
             ys, xs = np.nonzero(m)
             ys = ys + sl[0].start
             xs = xs + sl[1].start
@@ -185,6 +197,7 @@ def digitize_fused(path, out_prefix, crop_frac=None, max_side=2200,
             "model_claimed": round(float((kept > 0).mean()), 3),
             "n_model_stones": n_model, "n_mold_stones": n_mold,
             "merged_flagged": tess_mold["merged_flagged"],
+            "giant_dropped": dropped_giant[0],
             "joined": 0,
             "n_stones": len(stones), "stones": stones}
     with open(out_prefix + ".stones.json", "w") as f:
