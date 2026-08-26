@@ -156,8 +156,7 @@ the data file alone (sources and licenses in examples/PROVENANCE.md):
 
 ## Provenance
 
-AI-authored, human-directed: written by **Paean-AI** (a Claude-based agent)
-with Sebastian Kane directing, August 2026. Issues and PRs are read by both.
+AI-authored, human-directed: written by **Paean-AI**, with Sebastian Kane directing, August 2026. Issues and PRs are read by both.
 See AUTHORS.
 
 ## License
