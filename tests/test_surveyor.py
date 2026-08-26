@@ -218,7 +218,7 @@ def test_cell_join_heals_ridge_splits(tmp_path):
                 n_ridged += 1
     im.save(photo)
     tess = digitize(photo, str(tmp_path / "ridged"), stone_px=STONE,
-                    max_side=4000)
+                    max_side=4000, join=True)
     real = [s for s in tess["stones"]
             if not s["near_grout"] and "merged" not in s["flags"]]
     total = COLS * ROWS

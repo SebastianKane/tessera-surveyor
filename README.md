@@ -14,9 +14,8 @@ own eyes whether the data says the floor.
 *Gorgon medallion, opus tessellatum, National Archaeological Museum,
 Athens (photo CC0, via Wikimedia Commons) — photograph above, and below
 it the same floor re-rendered purely from its `.stones.json`:
-**57,206 stones** measured in tiled mode at native 3840px resolution
-(1,445 ridge-splits healed by the cell join), 100% coverage — grout color
-and stone walls calibrated locally per tile.
+**58,058 stones** measured in tiled mode at native 3840px resolution,
+100% coverage — grout color and stone walls calibrated locally per tile.
 More floors — including where the tool fails — in
 [examples/GALLERY.md](examples/GALLERY.md).*
 
@@ -77,7 +76,7 @@ Four files come out:
   "grout_rgb": [168, 148, 122],
   "coverage": 1.0,
   "merged_flagged": 22,
-  "joined": 2599,
+  "joined": 0,
   "n_stones": 18387,
   "stones": [
     {"poly": [[x, y], ...], "rgb": [r, g, b], "area_px": 214,
@@ -123,20 +122,37 @@ only as good as its list of what it cannot see:
   missing floor from a basin of stone. Until loss detection exists,
   treat stones in visibly damaged regions as suspect, and crop around
   damage when you can.
-- **The count runs high, though the cell join now takes the worst of
-  it.** Every minimum of the gradient field seeds a stone, so a textured
-  or veined tessera can be split along its internal ridges. The join
-  heals the splits whose seam is provably not grout (on a weathered floor
-  like the Alexander detail that recovers ~14% of the count), but the
-  bias does not vanish: **`n_stones` is still an upper bound, not a
-  census.**
+- **The count runs high.** Every minimum of the gradient field seeds a
+  stone, so a textured or veined tessera can be split along its internal
+  ridges: **`n_stones` is an upper bound, not a census.** The opt-in
+  `--join` heals splits whose seam is provably not grout (on the
+  weathered Alexander detail it recovers a large share of the over-count
+  and resolves a mushy white ground into individual tesserae) — but it is
+  opt-in for an honest reason: **color evidence has a ceiling.** A healed
+  ridge-split and two same-colored stones touching without visible grout
+  are the *same observation* — two same-colored cells, a non-grout seam —
+  so a rule aggressive enough to heal a weathered figure also devours a
+  pebble floor. Try it per floor and judge the render with your eyes.
 
 ## Future work — toward full accuracy
 
-(The first item of this list, seed consolidation, shipped as the cell
-join: adjacent cells whose shared seam is not grout-colored and whose
-colors agree are one stone. What remains:)
+(Seed consolidation shipped as the opt-in cell join; its ceiling — see
+Known limitations — is what the first three items below break through:)
 
+- **Model fusion**: use a cell-segmentation model (Cellpose) as ground
+  truth in the color ranges it demonstrably handles — it reads bright,
+  well-jointed regions with higher fidelity than the mold — and let the
+  value-blind growth cover the dark where the model is silent. The
+  validation prototype exists; fusing them is the single largest accuracy
+  win available.
+- **Join auto-calibration by reconstruction error**: choose per-floor
+  join thresholds by minimizing the pixel difference between the flat
+  render and the photograph — grout is mostly one color, so grout painted
+  where it shouldn't be is costly and measurable.
+- **Interactive threshold viewer**: segmentation costs minutes, but a
+  join decision over precomputed seams costs milliseconds — so ship the
+  seam records in the data file and re-join live in a browser as a
+  slider moves.
 - **Loss detection**: classify smooth regions as stone vs lacuna (texture
   statistics, or a learned model), so damage is reported as damage.
 - **Per-stone confidence**: every stone already carries `"conf": null` —

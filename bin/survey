@@ -45,10 +45,12 @@ ap.add_argument("--max-side", type=int, default=2200,
                 help="longest analyzed side (default 2200)")
 ap.add_argument("--note", default="",
                 help="free-text provenance note stored in the output")
-ap.add_argument("--no-join", action="store_true",
-                help="disable the cell join (adjacent cells whose seam is "
-                     "not grout-colored and whose colors agree are one "
-                     "stone split by an internal ridge; joined by default)")
+ap.add_argument("--join", action="store_true",
+                help="EXPERIMENTAL cell join: heal stones split along "
+                     "internal ridges (seam provably not grout + colors "
+                     "agree). Opt-in because color alone cannot tell a "
+                     "healed split from two same-colored touching stones "
+                     "— judge the result with your eyes, per floor")
 ap.add_argument("--tile", action="store_true",
                 help="tiled survey at native resolution: local grout and "
                      "wall calibration per 1024px core + 128px margin; "
@@ -65,9 +67,9 @@ if a.tile:
                                            else a.stone_px),
                    min_stone_px=a.min_stone_px,
                    min_solidity=a.min_solidity, rounds=a.rounds,
-                   source_note=a.note, join=not a.no_join)
+                   source_note=a.note, join=a.join)
 else:
     digitize(a.photo, out, crop_frac=crop, max_side=a.max_side,
              stone_px=a.stone_px, min_stone_px=a.min_stone_px,
              min_solidity=a.min_solidity, rounds=a.rounds,
-             source_note=a.note, join=not a.no_join)
+             source_note=a.note, join=a.join)

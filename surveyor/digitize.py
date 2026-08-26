@@ -58,7 +58,7 @@ FORMAT = "tessera-surveyor/1"
 
 def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
              min_stone_px=25, min_solidity=0.5, rounds=40, render=True,
-             source_note="", join=True):
+             source_note="", join=False):
     im = Image.open(path).convert("RGB")
     if crop_frac:
         fx0, fy0, fx1, fy1 = crop_frac
@@ -116,24 +116,89 @@ def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
     fill = (lab == 0) & (dist <= close_px)
     lab[fill] = lab[iy[fill], ix[fill]]
 
-    # THE CELL JOIN (Sebastian's rule, 08-26): the mold over-segments full
-    # stones along their internal ridges — a shadowed crack or a vein in
-    # the mineral reads as a wall. But a REAL wall has grout in it. So:
-    # two adjacent cells are one stone if (a) the photograph's color along
-    # their shared seam does NOT fall in the grout color range — no grout
-    # ran there — and (b) their own colors agree, because the parts of one
-    # over-split stone share its color while genuinely distinct neighbors
-    # do not. Distinct stones touching with sub-pixel grout fail (b) and
-    # stay separate, in the merge-flag family where they belong.
+    # THE CELL JOIN (Sebastian's rule, 08-26; OPT-IN): the mold
+    # over-segments full stones along their internal ridges — a vein or a
+    # shadowed crack reads as a wall. But a REAL wall has grout in it, and
+    # the test is RECONSTRUCTION COST: every seam we keep gets painted
+    # grout in the reconstruction, and grout is mostly one color — so
+    # painting it over true grout is nearly free, while painting it over
+    # stone is costly. A seam joins its two cells when writing grout there
+    # would cost more than calling it stone, in the flat-fill render's own
+    # pixel error.
+    #
+    # PASS 1 — grout candidates, from median sets of pixels: the thin
+    # unclaimed lattice votes, gated three ways — CERTIFIED (only pixels
+    # between two different cells; an internal sliver certifies nothing),
+    # DISSIMILAR (only joints between cells whose own colors differ; an
+    # over-split stone's fragments share its color, so their ridges never
+    # vote — otherwise the split certifies the very ridge that caused it),
+    # and QUORUM (a candidate from a handful of pixels is noise wearing a
+    # uniform). Candidates are a coarse grid of local medians plus the
+    # global median plus the segmentation's own ridge median — medians
+    # only, no clustering: one phantom mode can veto joins floor-wide.
+    #
+    # PASS 2 — enforce the merge per seam, nearest model in CHROMATICITY
+    # (a ridge is a darkened stone: same hue, less light — chroma sees
+    # through the darkening; plain RGB cannot tell stone-brown from
+    # grout-brown on a weathered floor and eats the figure). Ties go to
+    # grout.
+    # And the cells' own colors must agree, because the parts of one stone
+    # share its color while genuinely distinct neighbors do not — stones
+    # touching through sub-pixel grout stay in the merge-flag family.
+    #
+    # ⚠ WHY OPT-IN: color evidence has a ceiling here. A healed ridge-
+    # split and two same-colored stones touching without visible grout
+    # are the SAME observation — two same-colored cells, a non-grout
+    # seam — so any color rule aggressive enough to heal a weathered
+    # figure also devours a pebble floor. Telling them apart needs shape
+    # priors or a learned model (the conf field's job). Until then the
+    # join is a per-floor judgment: try it, look at the render, decide.
     if join:
-        gpix = rgb[lab1 == 0]
-        if len(gpix) > 100:
-            gmed = np.median(gpix, axis=0)
-            gtol = max(18.0, 2.0 * float(
-                np.median(np.abs(gpix - gmed).max(axis=1))))
-        else:
-            gmed, gtol = np.asarray(grout_color, float), 24.0
-        # seam samples between adjacent closed cells
+        unc = lab1 == 0
+        dtu = ndi.distance_transform_edt(unc)
+        thin = unc & (dtu <= max(2.0, 0.15 * stone_px))
+        BIG = 10 ** 9
+        d1 = ndi.grey_dilation(lab1, size=5)
+        d2 = -ndi.grey_dilation(-np.where(lab1 > 0, lab1, BIG), size=5)
+        thin = thin & (d1 != d2) & (d2 < BIG) & (d1 > 0)
+        d1c = np.clip(d1, 0, n + 1)
+        d2c = np.clip(np.where(d2 == BIG, 0, d2), 0, n + 1)
+        thin = thin & (np.abs(ref[d1c] - ref[d2c]).max(axis=-1) > 30)
+        QUORUM = 400
+        if thin.sum() < QUORUM:
+            thin[:] = False
+        gglobal = (np.median(rgb[thin], 0) if thin.any()
+                   else np.asarray(grout_color, float))
+        CELL = max(48, 4 * stone_px)
+        gw = rgb.shape[1] // CELL + 1
+        gcolor = {}
+        gy_, gx_ = np.nonzero(thin)
+        if len(gy_):
+            cells = (gy_ // CELL) * gw + (gx_ // CELL)
+            order = np.argsort(cells)
+            cells, gy_, gx_ = cells[order], gy_[order], gx_[order]
+            edges = np.nonzero(np.diff(cells))[0] + 1
+            for ci, s0, s1 in zip(cells[np.r_[0, edges]],
+                                  np.r_[0, edges],
+                                  np.r_[edges, len(cells)]):
+                if s1 - s0 >= 60:
+                    gcolor[int(ci)] = np.median(rgb[gy_[s0:s1], gx_[s0:s1]], 0)
+        cands = [gglobal, np.asarray(grout_color, float)]
+
+        def chroma(c):
+            c = np.asarray(c, float)
+            return c / max(float(c.sum()), 1e-6)
+
+        # each cell's MEASURED mean color — the seed pixel's color is one
+        # sample and a fragment seeded on its own ridge line wears the
+        # ridge's color, wrongly failing every agreement test it meets
+        cmean = ref.copy()
+        idx_ = np.arange(1, n + 1)
+        cnt_ = ndi.sum(np.ones_like(lab1, float), lab1, idx_)
+        for c_ in range(3):
+            s_ = ndi.sum(rgb[..., c_], lab1, idx_)
+            ok_ = cnt_ > 0
+            cmean[1:n + 1, c_][ok_] = s_[ok_] / cnt_[ok_]
         pairs = {}
         for (sa, sb) in ((lab[:, :-1], lab[:, 1:]), (lab[:-1, :], lab[1:, :])):
             m = (sa != sb) & (sa > 0) & (sb > 0)
@@ -157,10 +222,37 @@ def digitize(path, out_prefix, crop_frac=None, max_side=2200, stone_px=16,
             ys_ = np.array([p[0] for p in px_list])
             xs_ = np.array([p[1] for p in px_list])
             seam_med = np.median(smooth[ys_, xs_], axis=0)
-            seam_is_grout = np.abs(seam_med - gmed).max() <= gtol
-            colors_agree = np.abs(ref[a] - ref[b]).max() <= max(
+            cy_, cx_ = int(ys_.mean()), int(xs_.mean())
+            local = [gcolor[(cy_ // CELL) * gw + (cx_ // CELL)]]                 if (cy_ // CELL) * gw + (cx_ // CELL) in gcolor else []
+            stone_mean = 0.5 * (cmean[a] + cmean[b])
+            # cost of writing grout over this seam vs calling it stone,
+            # by two voices that each must clear an ABSOLUTE bar — the
+            # seam must stand a real distance from every grout candidate
+            # before a join is even considered, because dc_stone is
+            # measured against the very cells the seam borders and is
+            # small by construction; without the bar, "nearer stone" wins
+            # everywhere on any low-chroma floor by that bias alone.
+            #   CHROMA voice: a ridge is a darkened stone — same hue,
+            #   less light — so chroma sees through the darkening. Blind
+            #   where stone and grout share a hue (cream on mortar,
+            #   grisaille).
+            #   LUMINANCE-RGB voice: catches exactly those — a cream
+            #   stone on dark grout is chroma-invisible but 110 levels
+            #   apart in RGB. Its bar is high, because on a weathered
+            #   floor stone-brown and grout-brown are RGB neighbors and a
+            #   permissive RGB voice eats the figure.
+            dc_grout = min(float(np.abs(chroma(seam_med) - chroma(g_)).max())
+                           for g_ in cands + local)
+            dc_stone = float(np.abs(chroma(seam_med) - chroma(stone_mean)).max())
+            chroma_stone = (dc_grout > 0.025
+                            and dc_stone + 0.008 < dc_grout)
+            err_grout = min(float(np.abs(seam_med - g_).max())
+                            for g_ in cands + local)
+            err_stone = float(np.abs(seam_med - stone_mean).max())
+            rgb_stone = err_grout > 45.0 and err_stone + 12.0 < err_grout
+            colors_agree = np.abs(cmean[a] - cmean[b]).max() <= max(
                 24.0, min(tau[a], tau[b]))
-            if not seam_is_grout and colors_agree:
+            if (chroma_stone or rgb_stone) and colors_agree:
                 ra, rb = find(a), find(b)
                 if ra != rb:
                     parent[rb] = ra
@@ -303,7 +395,7 @@ def render_svg(tess):
 
 def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
                    min_stone_px=25, min_solidity=0.5, rounds=40,
-                   source_note="", join=True):
+                   source_note="", join=False):
     """Tiled survey at native resolution — accuracy through local
     calibration. One global grout threshold across a large photograph is
     a compromise: lighting drifts, and the 82nd percentile of the whole
