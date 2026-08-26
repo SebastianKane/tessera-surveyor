@@ -9,13 +9,14 @@ way that counts — by re-rendering the floor *from the data file alone*, so
 you can put the reconstruction beside the photograph and judge with your
 own eyes whether the data says the floor.
 
-![Alexander Mosaic, photograph and reconstruction](examples/alexander-proof.jpg)
+![Gorgon medallion, photograph and reconstruction](examples/gorgon-proof.jpg)
 
-*The Alexander Mosaic (detail), House of the Faun, Pompeii — photograph
-(public domain, via Wikimedia Commons) at top; the same floor re-rendered
-purely from its `.stones.json` in the middle (18,387 stones, 100%
-coverage); and at bottom the pixel-true render — every stone keeps its
-actual photograph pixels and only the grout is replaced.*
+*Gorgon medallion, opus tessellatum, National Archaeological Museum,
+Athens (photo CC0, via Wikimedia Commons) — photograph above, and below
+it the same floor re-rendered purely from its `.stones.json`:
+**68,881 stones** measured at native 3840px resolution, 100% coverage.
+More floors — including where the tool fails — in
+[examples/GALLERY.md](examples/GALLERY.md).*
 
 ## The algorithm: slime-mold the stones
 
@@ -144,15 +145,10 @@ only as good as its list of what it cannot see:
 
 ## Gallery
 
-Six more floors, each photograph above its reconstruction rendered from
-the data file alone (sources and licenses in examples/PROVENANCE.md):
-
-![Stag Hunt, Pella](examples/gallery-stag-hunt-pella.jpg)
-![Floor mosaic](examples/gallery-google-art.jpg)
-![Partridge, Walters Art Museum](examples/gallery-partridge-walters.jpg)
-![Gorgon medallion, NAMA Athens](examples/gallery-gorgon-nama.jpg)
-![Centaur mosaic, Altes Museum Berlin](examples/gallery-centaur-berlin.jpg)
-![Synagogue floor segment, Tiberias](examples/gallery-tiberias-synagogue.jpg)
+Seven more floors — Pella pebble work through a Tiberias synagogue
+segment, plus the Alexander Mosaic with its damage-tiling failure visible
+— in [examples/GALLERY.md](examples/GALLERY.md), with sources and
+licenses in [examples/PROVENANCE.md](examples/PROVENANCE.md).
 
 ## Provenance
 

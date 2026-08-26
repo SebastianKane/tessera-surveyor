@@ -44,3 +44,8 @@ surveyor's reconstruction rendered purely from its own data file
 **gallery-tiberias-synagogue.jpg** — Segment of a synagogue mosaic floor from Tiberias, Eretz Israel Museum, Tel Aviv.
 - Source: https://commons.wikimedia.org/wiki/File:Segment_of_synagogue_mosaic_floor_from_Tiberias_at_Eretz_Israel_Museum_in_Tel_Aviv_(detail).jpg
 - License: CC0
+
+**gorgon-proof.jpg** — Gorgon medallion, opus tessellatum, National
+Archaeological Museum, Athens; surveyed at native 3840px resolution.
+- Source: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
+- License: CC0
