@@ -14,7 +14,8 @@ own eyes whether the data says the floor.
 *Gorgon medallion, opus tessellatum, National Archaeological Museum,
 Athens (photo CC0, via Wikimedia Commons) — photograph above, and below
 it the same floor re-rendered purely from its `.stones.json`:
-**68,881 stones** measured at native 3840px resolution, 100% coverage.
+**58,058 stones** measured in tiled mode at native 3840px resolution,
+100% coverage — grout color and stone walls calibrated locally per tile.
 More floors — including where the tool fails — in
 [examples/GALLERY.md](examples/GALLERY.md).*
 

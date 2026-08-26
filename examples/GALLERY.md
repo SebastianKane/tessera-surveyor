@@ -6,11 +6,12 @@ Sources and licenses in [PROVENANCE.md](PROVENANCE.md).
 
 ## Gorgon medallion, NAMA Athens — the headline result
 
-68,881 stones at native 3840px resolution (`--max-side 3840`). The photo
-is not shipped for size; fetch it from the Commons link in PROVENANCE.md
-and reproduce with:
+58,058 stones surveyed in tiled mode at native 3840px resolution —
+12 tiles, each calibrating grout color and stone walls locally, seams
+deduped by centroid-in-core. The photo is not shipped for size; fetch it
+from the Commons link in PROVENANCE.md and reproduce with:
 
-    bin/survey gorgon.jpg -o gorgon --max-side 3840
+    bin/survey gorgon.jpg -o gorgon --tile
 
 ![Gorgon](gorgon-proof.jpg)
 

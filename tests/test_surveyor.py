@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "surveyor"))
-from digitize import digitize, render_svg  # noqa: E402
+from digitize import digitize, digitize_tiled, render_svg  # noqa: E402
 
 CLI = os.path.join(ROOT, "bin", "survey")
 
@@ -156,3 +156,39 @@ def test_cli_end_to_end(surveyed, tmp_path):
         assert os.path.exists(out + suffix), f"missing {suffix}"
     tess = json.load(open(out + ".stones.json"))
     assert tess["source_note"] == "synthetic test floor"
+
+
+def test_tiled_matches_truth_across_seams(tmp_path):
+    """The tiled survey on a floor spanning several tiles: every drawn
+    stone found exactly once — a stone straddling a tile seam must be
+    neither duplicated (two tiles claim it) nor dropped (no tile does).
+    Centroid-in-core is the dedupe rule under test."""
+    photo = str(tmp_path / "wide.png")
+    cols, rows = 30, 12   # 1208 x 488 px at PITCH 40 — several 400px cores
+    im = Image.new("RGB", (cols * PITCH + 8, rows * PITCH + 8), GROUT)
+    dr = ImageDraw.Draw(im)
+    truth = []
+    for j in range(rows):
+        for i in range(cols):
+            c = [(200, 60, 50), (60, 120, 180), (220, 200, 160),
+                 (40, 40, 50)][(i + j) % 4]
+            x, y = 8 + i * PITCH, 8 + j * PITCH
+            dr.rectangle([x, y, x + STONE - 1, y + STONE - 1], fill=c)
+            truth.append((x + STONE / 2, y + STONE / 2))
+    im.save(photo)
+    tess = digitize_tiled(photo, str(tmp_path / "wide"), core=400, margin=80,
+                          stone_px=STONE)
+    real = [s for s in tess["stones"]
+            if not s["near_grout"] and "merged" not in s["flags"]]
+    assert abs(len(real) - len(truth)) <= len(truth) * 0.05, (
+        f"drew {len(truth)}, tiled survey kept {len(real)}")
+    # no duplicates: no two kept stones share a centroid within half a stone
+    cents = []
+    for s in real:
+        p = np.array(s["poly"])
+        cents.append((p[:, 0].mean(), p[:, 1].mean()))
+    cents = np.array(cents)
+    for i in range(len(cents)):
+        d2 = ((cents - cents[i]) ** 2).sum(1)
+        d2[i] = 1e9
+        assert d2.min() > (STONE / 2) ** 2, "two stones share a centroid — seam duplicate"

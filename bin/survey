@@ -22,7 +22,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "surveyor"))
-from digitize import digitize  # noqa: E402
+from digitize import digitize, digitize_tiled  # noqa: E402
 
 ap = argparse.ArgumentParser(
     prog="survey", description=__doc__,
@@ -45,12 +45,25 @@ ap.add_argument("--max-side", type=int, default=2200,
                 help="longest analyzed side (default 2200)")
 ap.add_argument("--note", default="",
                 help="free-text provenance note stored in the output")
+ap.add_argument("--tile", action="store_true",
+                help="tiled survey at native resolution: local grout and "
+                     "wall calibration per 1024px core + 128px margin; "
+                     "best accuracy on large photographs (no pixel-true "
+                     "render in this mode)")
 a = ap.parse_args()
 
 if not os.path.exists(a.photo):
     sys.exit(f"survey: no such file: {a.photo}")
 out = a.out or os.path.splitext(a.photo)[0]
 crop = tuple(float(v) for v in a.crop.split(",")) if a.crop else None
-digitize(a.photo, out, crop_frac=crop, max_side=a.max_side,
-         stone_px=a.stone_px, min_stone_px=a.min_stone_px,
-         min_solidity=a.min_solidity, rounds=a.rounds, source_note=a.note)
+if a.tile:
+    digitize_tiled(a.photo, out, stone_px=(18 if a.stone_px == 16
+                                           else a.stone_px),
+                   min_stone_px=a.min_stone_px,
+                   min_solidity=a.min_solidity, rounds=a.rounds,
+                   source_note=a.note)
+else:
+    digitize(a.photo, out, crop_frac=crop, max_side=a.max_side,
+             stone_px=a.stone_px, min_stone_px=a.min_stone_px,
+             min_solidity=a.min_solidity, rounds=a.rounds,
+             source_note=a.note)

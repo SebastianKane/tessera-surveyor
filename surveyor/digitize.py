@@ -12,7 +12,9 @@ tighter tolerance than a black stone ever needs.
 """
 import json
 import os
+import shutil
 import sys
+import tempfile
 
 import numpy as np
 from PIL import Image
@@ -238,3 +240,85 @@ def render_svg(tess):
                      f'stroke-width="0.8"/>')
     parts.append("</svg>")
     return "\n".join(parts)
+
+
+def digitize_tiled(path, out_prefix, core=1024, margin=128, stone_px=18,
+                   min_stone_px=25, min_solidity=0.5, rounds=40,
+                   source_note=""):
+    """Tiled survey at native resolution — accuracy through local
+    calibration. One global grout threshold across a large photograph is
+    a compromise: lighting drifts, and the 82nd percentile of the whole
+    frame is right nowhere in particular. Processing in tiles (core plus
+    margin, stones kept only when their centroid lands in the core, so
+    seams dedupe themselves) re-derives the grout color, the adaptive
+    walls, and the ridge threshold locally, where they are true.
+
+    The pixel-true render is not produced in tiled mode (it needs the
+    whole-frame label map); the data file and the proof render are.
+    """
+    im = Image.open(path).convert("RGB")
+    W, H = im.size
+    tdir = tempfile.mkdtemp(prefix=".tiles-",
+                            dir=os.path.dirname(os.path.abspath(out_prefix))
+                            or ".")
+    stones, grout_votes, merged_total, tiles = [], [], 0, 0
+    try:
+        for y0 in range(0, H, core):
+            for x0 in range(0, W, core):
+                tx0, ty0 = max(0, x0 - margin), max(0, y0 - margin)
+                tx1 = min(W, x0 + core + margin)
+                ty1 = min(H, y0 + core + margin)
+                # a remainder tile is widened BACKWARD into already-covered
+                # ground rather than skipped: skipping would leave its core
+                # surveyed by no tile at all, and the extra overlap is free
+                # (centroid-in-core dedupes it)
+                if tx1 - tx0 < 200:
+                    tx0 = max(0, tx1 - 200)
+                if ty1 - ty0 < 200:
+                    ty0 = max(0, ty1 - 200)
+                if tx1 - tx0 < 200 or ty1 - ty0 < 200:
+                    continue   # the photograph itself is smaller than 200px
+                tp = os.path.join(tdir, f"{tx0}_{ty0}.png")
+                im.crop((tx0, ty0, tx1, ty1)).save(tp)
+                tess = digitize(tp, os.path.join(tdir, f"t{tx0}_{ty0}"),
+                                max_side=10 ** 9, stone_px=stone_px,
+                                min_stone_px=min_stone_px,
+                                min_solidity=min_solidity, rounds=rounds,
+                                render=False)
+                os.remove(tp)
+                tiles += 1
+                grout_votes.append(tess["grout_rgb"])
+                merged_total += tess["merged_flagged"]
+                cx1, cy1 = min(W, x0 + core), min(H, y0 + core)
+                for s in tess["stones"]:
+                    xs = [p[0] for p in s["poly"]]
+                    ys = [p[1] for p in s["poly"]]
+                    mx = sum(xs) / len(xs) + tx0
+                    my = sum(ys) / len(ys) + ty0
+                    if not (x0 <= mx < cx1 and y0 <= my < cy1):
+                        continue
+                    s["poly"] = [[round(px + tx0, 1), round(py + ty0, 1)]
+                                 for px, py in s["poly"]]
+                    stones.append(s)
+    finally:
+        shutil.rmtree(tdir, ignore_errors=True)
+    gc = ([int(np.median([g[i] for g in grout_votes])) for i in range(3)]
+          if grout_votes else [110, 95, 82])
+    tess = {"format": FORMAT,
+            "source_file": os.path.basename(path),
+            "source_note": source_note,
+            "method": "slime-mold (tiled)",
+            "analyzed_w": W, "analyzed_h": H, "crop_frac": None,
+            "grout_rgb": gc, "coverage": 1.0,
+            "tiling": {"core": core, "margin": margin, "tiles": tiles},
+            "merged_flagged": merged_total,
+            "n_stones": len(stones), "stones": stones}
+    with open(out_prefix + ".stones.json", "w") as f:
+        json.dump(tess, f)
+    with open(out_prefix + "-digital.svg", "w") as f:
+        f.write(render_svg(tess))
+    im.save(out_prefix + "-photo.png")
+    print(f"{os.path.basename(path)}: {len(stones)} stones grown in "
+          f"{tiles} tiles ({merged_total} merges flagged) "
+          f"-> {out_prefix}.stones.json")
+    return tess
