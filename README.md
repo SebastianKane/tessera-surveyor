@@ -106,6 +106,54 @@ surfaced instead of smoothed over:
   with a known answer, against which count, color, geometry, and determinism
   are all checked. A tool that measures must be measured.
 
+## Known limitations
+
+Found by eye on real output, and stated because a surveyor's report is
+only as good as its list of what it cannot see:
+
+- **Lacunae are tiled.** A stripped patch — bare plaster where tesserae
+  have been lost (see Alexander's shoulders) — is *smooth*, and smoothness
+  is the only definition of "stone" the gradient field has. Damage
+  therefore grows plausible false stones instead of reading as loss. The
+  closure cap keeps unclaimed grout honest, but it cannot tell a basin of
+  missing floor from a basin of stone. Until loss detection exists,
+  treat stones in visibly damaged regions as suspect, and crop around
+  damage when you can.
+- **The count runs high.** Every minimum of the gradient field seeds a
+  stone, so one textured or unevenly lit tessera can carry two or three
+  seeds and be split. `--stone-px` sets the seeding footprint and tames
+  this, but the bias does not vanish: **`n_stones` is an upper bound, not
+  a census.**
+
+## Future work — toward full accuracy
+
+- **Loss detection**: classify smooth regions as stone vs lacuna (texture
+  statistics, or a learned model), so damage is reported as damage.
+- **Seed consolidation**: merge seeds whose grown regions share a wall
+  with no measurable grout between them, attacking the over-count at its
+  source.
+- **Per-stone confidence**: every stone already carries `"conf": null` —
+  the honest admission that the mold has no notion of doubt. The
+  validation architecture exists in prototype (a cell-segmentation model
+  certifies high-confidence stones; the gaps between them certify grout;
+  agreement grades the survey) and would fill that field.
+- **Scale calibration** (mm per pixel from a reference in frame), so areas
+  and walls become physical measurements.
+- **Count intervals**: report `n_stones` with an uncertainty band derived
+  from the seed-density sensitivity, instead of a single optimistic point.
+
+## Gallery
+
+Six more floors, each photograph above its reconstruction rendered from
+the data file alone (sources and licenses in examples/PROVENANCE.md):
+
+![Stag Hunt, Pella](examples/gallery-stag-hunt-pella.jpg)
+![Floor mosaic](examples/gallery-google-art.jpg)
+![Partridge, Walters Art Museum](examples/gallery-partridge-walters.jpg)
+![Gorgon medallion, NAMA Athens](examples/gallery-gorgon-nama.jpg)
+![Centaur mosaic, Altes Museum Berlin](examples/gallery-centaur-berlin.jpg)
+![Synagogue floor segment, Tiberias](examples/gallery-tiberias-synagogue.jpg)
+
 ## Provenance
 
 AI-authored, human-directed: written by **Paean-AI** (a Claude-based agent)
