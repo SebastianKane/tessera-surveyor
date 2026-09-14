@@ -25,17 +25,19 @@ GROUT = (110, 100, 90)
 COLS, ROWS, PITCH, STONE = 12, 10, 40, 32   # 120 stones, 8px joints
 
 
-def draw_floor(path, jitter=0):
+PALETTE = [(200, 60, 50), (60, 120, 180), (220, 200, 160), (40, 40, 50)]
+
+
+def draw_floor(path, jitter=0, grout=GROUT, palette=PALETTE):
     """A floor whose true answer is known: COLS x ROWS colored squares on
     grout, optionally with deterministic per-stone color jitter."""
-    im = Image.new("RGB", (COLS * PITCH + 8, ROWS * PITCH + 8), GROUT)
+    im = Image.new("RGB", (COLS * PITCH + 8, ROWS * PITCH + 8), grout)
     dr = ImageDraw.Draw(im)
     rng = np.random.RandomState(7)
     truth = []
     for j in range(ROWS):
         for i in range(COLS):
-            base = [(200, 60, 50), (60, 120, 180), (220, 200, 160),
-                    (40, 40, 50)][(i + j) % 4]
+            base = palette[(i + j) % 4]
             c = tuple(int(np.clip(v + rng.randint(-jitter, jitter + 1), 0, 255))
                       for v in base) if jitter else base
             x, y = 8 + i * PITCH, 8 + j * PITCH
@@ -206,8 +208,7 @@ def test_cell_join_heals_ridge_splits(tmp_path):
     n_ridged = 0
     for j in range(ROWS):
         for i in range(COLS):
-            base = [(200, 60, 50), (60, 120, 180), (220, 200, 160),
-                    (40, 40, 50)][(i + j) % 4]
+            base = PALETTE[(i + j) % 4]
             x, y = 8 + i * PITCH, 8 + j * PITCH
             dr.rectangle([x, y, x + STONE - 1, y + STONE - 1], fill=base)
             if (i + j) % 3 == 0:
@@ -240,3 +241,39 @@ def test_join_respects_true_grout(tmp_path):
     assert a["joined"] == 0, (
         f"{a['joined']} joins fired across genuine grout seams")
     assert a["n_stones"] == b["n_stones"]
+
+
+# ------------------------------------------------------------ learned wall
+def test_learned_wall_on_the_ground_truth_floor(tmp_path):
+    """The learned stopping rule, seeded from the gradient field, must
+    find the drawn stones and their colors — weights ship in models/ and
+    inference is numpy only. The wall reads LUMINANCE, and it learned its
+    stopping rule on stone against a mortar BRIGHTER than the stone — the
+    pale lime mortar of the ancient floors it was trained on. So this floor
+    has a pale grout and stones darker than it. A joint that is darker than
+    its stones, or that differs in hue alone, is the mold's to see, not the
+    wall's; the README says so."""
+    from wall import digitize_learned
+    p = str(tmp_path / "floor.png")
+    truth = draw_floor(p, jitter=6, grout=(215, 205, 195),
+                       palette=[(200, 60, 50), (60, 120, 180), (170, 150, 110), (40, 40, 50)])
+    tess = digitize_learned(p, str(tmp_path / "lw"), model=None,
+                            stone_px=STONE, max_side=4000, render=True)
+    assert tess["method"].startswith("learned wall")
+    assert tess["wall_params"] == 833
+    n = len(truth)
+    assert 0.95 * n <= tess["n_stones"] <= 1.10 * n, tess["n_stones"]
+    # every drawn stone is recovered with its color
+    found = 0
+    for t in truth:
+        cx, cy, col = t["cx"], t["cy"], t["rgb"]
+        best = None
+        for s in tess["stones"]:
+            xs = [q[0] for q in s["poly"]]; ys = [q[1] for q in s["poly"]]
+            if min(xs) <= cx <= max(xs) and min(ys) <= cy <= max(ys):
+                best = s; break
+        if best and max(abs(a - b) for a, b in zip(best["rgb"], col)) <= 12:
+            found += 1
+    assert found >= 0.95 * n, found
+    assert os.path.exists(str(tmp_path / "lw-digital.svg"))
+    assert os.path.exists(str(tmp_path / "lw-pixels.png"))

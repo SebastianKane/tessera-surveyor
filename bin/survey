@@ -4,7 +4,7 @@
 Usage:
   survey PHOTO [-o PREFIX] [--crop X0,Y0,X1,Y1] [--stone-px N]
          [--min-stone-px N] [--min-solidity F] [--max-side N] [--rounds N]
-         [--note TEXT]
+         [--note TEXT] [--learned [--model auto|PATH] [--gpu]]
 
 Writes three files:
   PREFIX.stones.json   every stone: boundary polygon, mean color, area,
@@ -58,6 +58,20 @@ ap.add_argument("--fuse", action="store_true",
                      "refuses loudly without it")
 ap.add_argument("--gpu", action="store_true",
                 help="with --fuse: run cellpose on the GPU")
+ap.add_argument("--learned", action="store_true",
+                help="learned wall: identify one point per stone, spread "
+                     "with a trained stopping rule, and read light-on-light "
+                     "collisions from both sides. No closure: refused ground "
+                     "stays refused. Weights in models/ (numpy only)")
+ap.add_argument("--model", default=None,
+                help="with --learned: place the points with a cell-"
+                     "segmentation model — 'auto' for cellpose's default "
+                     "weights, or a path to fine-tuned weights. Without it "
+                     "the points come from the gradient field")
+ap.add_argument("--wall", default=None, help="with --learned: wall weights (.npz)")
+ap.add_argument("--seam", default=None, help="with --learned: seam weights (.npz)")
+ap.add_argument("--no-seam", action="store_true",
+                help="with --learned: skip the two-sided seam pass")
 ap.add_argument("--tile", action="store_true",
                 help="tiled survey at native resolution: local grout and "
                      "wall calibration per 1024px core + 128px margin; "
@@ -69,7 +83,14 @@ if not os.path.exists(a.photo):
     sys.exit(f"survey: no such file: {a.photo}")
 out = a.out or os.path.splitext(a.photo)[0]
 crop = tuple(float(v) for v in a.crop.split(",")) if a.crop else None
-if a.fuse:
+if a.learned:
+    from wall import digitize_learned  # noqa: E402
+    digitize_learned(a.photo, out, crop_frac=crop, max_side=a.max_side,
+                     stone_px=a.stone_px, min_stone_px=a.min_stone_px,
+                     rounds=a.rounds, source_note=a.note, model=a.model,
+                     gpu=a.gpu, wall_path=a.wall, seam_path=a.seam,
+                     no_seam=a.no_seam)
+elif a.fuse:
     from fuse import digitize_fused  # noqa: E402
     digitize_fused(a.photo, out, crop_frac=crop, max_side=a.max_side,
                    stone_px=a.stone_px, min_stone_px=a.min_stone_px,
