@@ -45,3 +45,14 @@ surveyor's reconstruction rendered purely from its own data file
 Archaeological Museum, Athens; surveyed at native 3840px resolution.
 - Source: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
 - License: CC0
+
+## The learned wall
+
+**learned-wall-verdicts.jpg** — an 860×645 region of the Gorgon medallion
+(same CC0 photograph as gorgon-proof.jpg, at native resolution), with the
+learned wall's 529 outlines drawn in the color of the verdict a human
+gave each one. The verdicts are Sebastian Kane's, given stone by stone in
+a purpose-built annotator; they are the training signal for models/wall.npz
+and models/seam.npz.
+- Source photograph: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
+- License: CC0

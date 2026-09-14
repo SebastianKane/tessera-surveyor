@@ -65,6 +65,11 @@ Four files come out:
 --min-solidity F     merge gate threshold (0.55)
 --max-side N         longest analyzed side (2200)
 --note TEXT          provenance note carried into the output
+--learned            the learned wall: identify -> spread -> boundary, with
+                     a trained stopping rule and a two-sided seam read at
+                     pale collisions; no closure. --model auto|PATH places
+                     the points with cellpose; --no-seam skips the seam.
+                     See "The learned wall" below.
 --fuse               EXPERIMENTAL fused survey: a cell-segmentation model
                      (cellpose, installed separately) claims the stones it
                      is sure of — bright, well-jointed tesserae are its
@@ -98,6 +103,63 @@ Four files come out:
 counter-clockwise. `wall` is the color-delta tolerance the stone grew
 with; a cramped wall (`near_grout: true`) marks stones that sat close to
 the grout color and may be over-split.
+
+## The learned wall (`--learned`)
+
+The mold's stopping rule is one line: grow while the color delta stays
+under a hand-tuned wall. `--learned` replaces that line with a rule the
+floor taught, and splits the survey into the three questions it always
+contained:
+
+1. **Identify** — one interior point per stone. A cell-segmentation model
+   places the points if you have one (`--model auto` for cellpose's stock
+   weights, `--model PATH` for fine-tuned ones); without it, the gradient
+   minima the mold uses, gated by the grout color so a point in mortar
+   never grows mortar.
+2. **Spread** — every stone grows from its point, all together, one ring
+   per round, and a small network decides each candidate pixel from the
+   stone's own point of view: six luminance samples along the outward
+   normal relative to the stone's core, the core delta, and the gradient.
+   Eight numbers in, 833 parameters, trained on human-verified outlines.
+3. **Boundary** — where two pale stones collide, a second network reads
+   the corridor between them from *both* sides (the ridge profile along
+   the line joining the two cores) and releases what is mortar. A
+   one-sided rule is weakest exactly there: measured at those collisions
+   on held-out stones, the wall alone scores 0.67 and the two-sided read
+   0.88.
+
+There is no closure step. Ground the wall refused stays refused, and what
+it calls mortar is the record's mortar.
+
+![Verified outlines on the Gorgon medallion](examples/learned-wall-verdicts.jpg)
+
+*The training loop, made visible: 529 learned-wall outlines on a
+860×645 region of the Gorgon medallion, each judged by eye in a purpose-
+built annotator — green passed, the rest are the faults by kind. The
+passes train the next wall; the merged and trailing stones, almost all
+of them white on white, are the open problem. The stones were located by
+a cellpose model fine-tuned on the previous round's passes, so the two
+halves train each other and a human judges every turn.*
+
+```
+bin/survey photo.jpg -o out --learned                       # points from the gradient field
+bin/survey photo.jpg -o out --learned --model auto --gpu    # points from cellpose
+```
+
+Inference needs only numpy, scipy and Pillow — the weights ship in
+`models/` as `.npz` (9 KB and 7 KB). Training needs scikit-learn and a
+verdicts file (`surveyor/learn.py PHOTO STONES.json VERDICTS.json`);
+the fine-tuned cellpose weights are not in this repository (1.2 GB).
+
+**What the wall cannot see, stated plainly.** It reads luminance, and it
+learned on stone against a mortar *brighter* than the stone — the pale
+lime mortar of the floors it was trained on. A joint darker than its
+stones, or one that differs from them in hue alone, is invisible to it;
+the mold's max-channel wall sees both, so use the mold there. And its
+look-ahead is five pixels: on a photograph where a tessera is five pixels
+across, it has nothing to look at (see the Tiberias segment in the
+gallery). Each stone carries `"source": "model"` or `"field"` so you know
+who placed its point.
 
 ## Honesty as a design rule
 
@@ -147,12 +209,12 @@ only as good as its list of what it cannot see:
 (Seed consolidation shipped as the opt-in cell join; its ceiling — see
 Known limitations — is what the first three items below break through:)
 
-- **Model fusion**: use a cell-segmentation model (Cellpose) as ground
-  truth in the color ranges it demonstrably handles — it reads bright,
-  well-jointed regions with higher fidelity than the mold — and let the
-  value-blind growth cover the dark where the model is silent. The
-  validation prototype exists; fusing them is the single largest accuracy
-  win available.
+- **Model fusion** shipped as `--fuse`, and the learned wall (`--learned`)
+  is the road past it: the model places the points, the learned rule
+  draws the stones. Next on that road: a wall that sees color as well as
+  luminance, so dark-mortar and hue-only joints stop being the mold's
+  alone; and a locator trained to place *one point inside each stone*
+  directly, which is all the spread step ever needed.
 - **Join auto-calibration by reconstruction error**: choose per-floor
   join thresholds by minimizing the pixel difference between the flat
   render and the photograph — grout is mostly one color, so grout painted
