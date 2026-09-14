@@ -56,3 +56,9 @@ a purpose-built annotator; they are the training signal for models/wall.npz
 and models/seam.npz.
 - Source photograph: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
 - License: CC0
+
+**learned-gorgon.jpg, learned-alexander.jpg, learned-googleart.jpg,
+learned-partridge.jpg, learned-centaur.jpg, learned-tiberias.jpg** — the
+gallery floors surveyed with `--learned`; photograph above, data-only
+reconstruction below. Source photographs and licenses as listed above
+for the same floors (alexander-detail.jpg for the Alexander detail).
