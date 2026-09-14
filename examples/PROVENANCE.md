@@ -1,64 +1,49 @@
-# Example photograph
+# Example photographs
 
 **alexander-detail.jpg** — "Alexander Mosaic detail of Alexander the Great",
 House of the Faun, Pompeii (c. 100 BC), now in the Naples National
-Archaeological Museum.
+Archaeological Museum. The one source photograph shipped in the repository.
 
 - Source: Wikimedia Commons,
   https://commons.wikimedia.org/wiki/File:Alexander_Mosaic_detail_of_Alexander_the_Great.jpg
 - License: Public domain (faithful reproduction of a two-dimensional work
   whose copyright has expired).
 
-**alexander-proof.jpg** — the photograph above (top) and the surveyor's
-reconstruction rendered purely from its own .stones.json output (bottom),
-produced with:
+## Gallery images
 
-    bin/survey examples/alexander-detail.jpg -o alexander --crop 0.15,0.10,0.85,0.55
+Each pairs the source photograph (top) with the surveyor's reconstruction
+rendered purely from its own data file (bottom), produced with
+`bin/survey ... --learned --model PATH --gpu --max-side 4000`. The other
+source photographs are not shipped for size; fetch them from the Commons
+links and reproduce.
 
-## Gallery photographs
+**gorgon.jpg** — Gorgon medallion, opus tessellatum, National Archaeological Museum, Athens.
+- Source: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
+- License: CC0
 
-Each gallery image pairs the source photograph (top) with the
-surveyor's reconstruction rendered purely from its own data file
-(bottom). Source photographs:
+**alexander.jpg** — the Alexander detail above, cropped `--crop 0.15,0.10,0.85,0.55`.
 
-**gallery-google-art.jpg** — Roman floor mosaic (Google Art Project).
+**googleart.jpg** — Roman floor mosaic (Google Art Project).
 - Source: https://commons.wikimedia.org/wiki/File:Mosaic_-_Google_Art_Project.jpg
 - License: Public domain
 
-**gallery-partridge-walters.jpg** — Floor Mosaic with Partridge, Roman, Walters Art Museum 43.18.
+**partridge.jpg** — Floor Mosaic with Partridge, Roman, Walters Art Museum 43.18.
 - Source: https://commons.wikimedia.org/wiki/File:Roman_-_Floor_Mosaic_with_Partridge_-_Walters_4318.jpg
 - License: Public domain
 
-**gallery-gorgon-nama.jpg** — Gorgon medallion, opus tessellatum, National Archaeological Museum, Athens.
-- Source: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
-- License: CC0
-
-**gallery-centaur-berlin.jpg** — Centaur mosaic from Hadrian's Villa, Altes Museum, Berlin (Google Art Project).
+**centaur.jpg** — Centaur mosaic from Hadrian's Villa, Altes Museum, Berlin (Google Art Project).
 - Source: https://commons.wikimedia.org/wiki/File:Centaur_mosaic_-_Google_Art_Project_-_CropFrame_-_Plus1ev.jpg
 - License: Public domain
 
-**gallery-tiberias-synagogue.jpg** — Segment of a synagogue mosaic floor from Tiberias, Eretz Israel Museum, Tel Aviv.
+**tiberias.jpg** — Segment of a synagogue mosaic floor from Tiberias, Eretz Israel Museum, Tel Aviv.
 - Source: https://commons.wikimedia.org/wiki/File:Segment_of_synagogue_mosaic_floor_from_Tiberias_at_Eretz_Israel_Museum_in_Tel_Aviv_(detail).jpg
 - License: CC0
 
-**gorgon-proof.jpg** — Gorgon medallion, opus tessellatum, National
-Archaeological Museum, Athens; surveyed at native 3840px resolution.
-- Source: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
-- License: CC0
+## The verdicts
 
-## The learned wall
-
-**learned-wall-verdicts.jpg** — an 860×645 region of the Gorgon medallion
-(same CC0 photograph as gorgon-proof.jpg, at native resolution), with the
-learned wall's 529 outlines drawn in the color of the verdict a human
-gave each one. The verdicts are Sebastian Kane's, given stone by stone in
-a purpose-built annotator; they are the training signal for models/wall.npz
-and models/seam.npz.
-- Source photograph: https://commons.wikimedia.org/wiki/File:Mosaic_floor_opus_tessellatum_detail_Gorgone_NAMA_Athens_Greece.jpg
-- License: CC0
-
-**learned-gorgon.jpg, learned-alexander.jpg, learned-googleart.jpg,
-learned-partridge.jpg, learned-centaur.jpg, learned-tiberias.jpg** — the
-gallery floors surveyed with `--learned`; photograph above, data-only
-reconstruction below. Source photographs and licenses as listed above
-for the same floors (alexander-detail.jpg for the Alexander detail).
+**verdicts.jpg** — an 860×645 region of the Gorgon medallion (the CC0
+photograph above, at native resolution) with the learned wall's 529
+outlines drawn in the color of the verdict a human gave each one. The
+verdicts are Sebastian Kane's, given stone by stone in a purpose-built
+annotator; they are the training signal for models/wall.npz and
+models/seam.npz.

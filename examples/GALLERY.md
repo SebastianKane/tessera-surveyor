@@ -1,93 +1,38 @@
 # Gallery
 
-Each image pairs the source photograph (top) with the surveyor's
-reconstruction rendered purely from its own `.stones.json` (bottom).
-Sources and licenses in [PROVENANCE.md](PROVENANCE.md).
-
-## Gorgon medallion, NAMA Athens — the headline result
-
-58,058 stones surveyed in tiled mode at native 3840px resolution —
-12 tiles, each calibrating grout color and stone walls locally, seams
-deduped by centroid-in-core. The photo is not shipped for size; fetch it
-from the Commons link in PROVENANCE.md and reproduce with:
-
-    bin/survey gorgon.jpg -o gorgon --tile
-
-![Gorgon](gorgon-proof.jpg)
-
-## Alexander Mosaic (detail), House of the Faun, Pompeii
-
-18,387 stones. Three panels: photograph, data-only reconstruction, and
-the pixel-true render. **Look at the shoulders**: the stripped patches
-(lost tesserae) are tiled with plausible false stones — this is the
-lacuna limitation from the README, kept here on purpose.
-
-![Alexander](alexander-proof.jpg)
-
-## Floor mosaic (Google Art Project)
-
-32,750 stones.
-
-![Floor mosaic](gallery-google-art.jpg)
-
-## Partridge, Walters Art Museum
-
-20,373 stones, 423 merges flagged — fine white ground with sub-pixel
-joints, the merge gate's busiest day in this set.
-
-![Partridge](gallery-partridge-walters.jpg)
-
-## Gorgon medallion at reduced resolution
-
-22,961 stones at the default `--max-side 2200` — compare with the
-headline result above to see what native resolution buys: the same floor,
-three times the stones resolved.
-
-![Gorgon at 2200](gallery-gorgon-nama.jpg)
-
-## Centaur mosaic, Altes Museum Berlin
-
-27,692 stones.
-
-![Centaur](gallery-centaur-berlin.jpg)
-
-## Synagogue floor segment, Tiberias
-
-2,961 stones.
-
-![Tiberias](gallery-tiberias-synagogue.jpg)
-
-# The learned wall, floor by floor
-
-The same six floors surveyed with `--learned`, points placed by the
-fine-tuned cellpose model (`--model PATH --gpu`), at native resolution up
-to 4000px on the long side. Photograph above, reconstruction from the
-data alone below. The mold's count for the same floor is given beside
-each; the mold seeds every gradient minimum, so its count is an upper
-bound, while the learned survey places one point per stone the model
-sees — closer to a census, and where it is wrong it is wrong by
-*missing* a stone (its ground goes to a neighbour or stays unclaimed),
-never by inventing one.
+Six floors surveyed with the learned wall (`--learned`), points placed by
+a cellpose model fine-tuned on the Gorgon's verified outlines, at native
+resolution up to 4000px on the long side. Each image pairs the source
+photograph (top) with the reconstruction rendered purely from its own
+`.stones.json` (bottom). Sources and licenses in [PROVENANCE.md](PROVENANCE.md).
 
     bin/survey floor.jpg -o floor --learned --model PATH --gpu --max-side 4000
+
+The classic mold's count for the same floor is given beside each. The
+mold seeds every gradient minimum, so its count is an upper bound; the
+learned survey places one point per stone the model sees, so its count
+is nearer a census, and where it is wrong it is wrong by *missing* a
+stone (its ground goes to a neighbour or stays unclaimed), never by
+inventing one.
 
 ## Gorgon medallion, NAMA Athens
 
 15,889 stones (the mold: 58,058), coverage 83%. On the 860×645 region
 that trained the wall, a human judged 529 of these outlines: 379 clean
 passes, 55 merged, 33 trailing into mortar — almost all of the faults
-white on white.
+white on white. That batch is the picture in the README.
 
-![Gorgon, learned](learned-gorgon.jpg)
+![Gorgon](gorgon.jpg)
 
-## Alexander Mosaic (detail)
+## Alexander Mosaic (detail), House of the Faun, Pompeii
 
 8,578 stones (the mold: 18,387), coverage 83%. The white ground resolves
 into tesserae instead of a mush; the weathered gold of the cuirass does
 not, and that is the floor, not the tool — the stones there are worn to
-one surface.
+one surface. **Look at the shoulders**: stripped patches where tesserae
+are lost still read as stone, the lacuna limitation from the README.
 
-![Alexander, learned](learned-alexander.jpg)
+![Alexander](alexander.jpg)
 
 ## Floor mosaic (Google Art Project)
 
@@ -95,7 +40,7 @@ one surface.
 learned count is higher: fine, regular, well-jointed white ground the
 model reads stone by stone.
 
-![Google Art floor, learned](learned-googleart.jpg)
+![Google Art floor](googleart.jpg)
 
 ## Partridge, Walters Art Museum
 
@@ -103,14 +48,14 @@ model reads stone by stone.
 white joints that were the merge gate's busiest day resolve here into
 individual stones — 19,307 pale collisions read from both sides.
 
-![Partridge, learned](learned-partridge.jpg)
+![Partridge](partridge.jpg)
 
 ## Centaur mosaic, Altes Museum Berlin
 
 27,623 stones (the mold: 27,692). The two methods agree within a
 quarter of a percent on this floor.
 
-![Centaur, learned](learned-centaur.jpg)
+![Centaur](centaur.jpg)
 
 ## Synagogue floor segment, Tiberias — where it fails
 
@@ -120,4 +65,4 @@ nothing to look at, the model places a point in one stone in three, and
 the result is regions, not stones. Below the wall's resolution the mold
 is the better instrument. Kept here on purpose.
 
-![Tiberias, learned](learned-tiberias.jpg)
+![Tiberias](tiberias.jpg)

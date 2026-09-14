@@ -9,20 +9,78 @@ way that counts — by re-rendering the floor *from the data file alone*, so
 you can put the reconstruction beside the photograph and judge with your
 own eyes whether the data says the floor.
 
-![Gorgon medallion, photograph and reconstruction](examples/gorgon-proof.jpg)
+![Gorgon medallion, photograph and reconstruction](examples/gorgon.jpg)
 
 *Gorgon medallion, opus tessellatum, National Archaeological Museum,
 Athens (photo CC0, via Wikimedia Commons) — photograph above, and below
 it the same floor re-rendered purely from its `.stones.json`:
-**58,058 stones** measured in tiled mode at native 3840px resolution,
-100% coverage — grout color and stone walls calibrated locally per tile.
-More floors — including where the tool fails — in
-[examples/GALLERY.md](examples/GALLERY.md).*
+**15,889 stones** at native 3840px resolution, one point placed in each
+by a cell-segmentation model fine-tuned on this floor's own verified
+outlines, every boundary drawn by a learned stopping rule. More floors,
+including the one where it fails, in [examples/GALLERY.md](examples/GALLERY.md).*
 
-## The algorithm: slime-mold the stones
+## How it works: identify, spread, boundary
 
-Everything here is numpy, scipy, and Pillow — nothing to download, nothing
-to fine-tune, every result reproducible to the byte.
+A survey of a floor is three questions, and `--learned` answers each
+with its own instrument:
+
+1. **Identify** — one interior point per stone. A cell-segmentation model
+   places the points if you have one (`--model auto` for cellpose's stock
+   weights, `--model PATH` for fine-tuned ones); without it, the gradient
+   minima the mold uses, gated by the grout color so a point in mortar
+   never grows mortar.
+2. **Spread** — every stone grows from its point, all together, one ring
+   per round, and a small network decides each candidate pixel from the
+   stone's own point of view: six luminance samples along the outward
+   normal relative to the stone's core, the core delta, and the gradient.
+   Eight numbers in, 833 parameters, trained on human-verified outlines.
+3. **Boundary** — where two pale stones collide, a second network reads
+   the corridor between them from *both* sides (the ridge profile along
+   the line joining the two cores) and releases what is mortar. A
+   one-sided rule is weakest exactly there: measured at those collisions
+   on held-out stones, the wall alone scores 0.67 and the two-sided read
+   0.88.
+
+There is no closure step. Ground the wall refused stays refused, and what
+it calls mortar is the record's mortar.
+
+![Verified outlines on the Gorgon medallion](examples/verdicts.jpg)
+
+*The training loop, made visible: 529 learned-wall outlines on a
+860×645 region of the Gorgon medallion, each judged by eye in a purpose-
+built annotator — green passed, the rest are the faults by kind. The
+passes train the next wall; the merged and trailing stones, almost all
+of them white on white, are the open problem. The stones were located by
+a cellpose model fine-tuned on the previous round's passes, so the two
+halves train each other and a human judges every turn.*
+
+```
+bin/survey photo.jpg -o out --learned                       # points from the gradient field
+bin/survey photo.jpg -o out --learned --model auto --gpu    # points from cellpose
+```
+
+Inference needs only numpy, scipy and Pillow — the weights ship in
+`models/` as `.npz` (9 KB and 7 KB). Training needs scikit-learn and a
+verdicts file (`surveyor/learn.py PHOTO STONES.json VERDICTS.json`);
+the fine-tuned cellpose weights are not in this repository (1.2 GB).
+
+**What the wall cannot see, stated plainly.** It reads luminance, and it
+learned on stone against a mortar *brighter* than the stone — the pale
+lime mortar of the floors it was trained on. A joint darker than its
+stones, or one that differs from them in hue alone, is invisible to it;
+the mold's max-channel wall sees both, so use the mold there. And its
+look-ahead is five pixels: on a photograph where a tessera is five pixels
+across, it has nothing to look at (see the Tiberias segment in the
+gallery). Each stone carries `"source": "model"` or `"field"` so you know
+who placed its point.
+
+## The classic survey: slime-mold the stones
+
+The mode `bin/survey` runs without flags, and the instrument the learned
+wall grew out of. Everything here is numpy, scipy, and Pillow — nothing
+to download, nothing to fine-tune, every result reproducible to the
+byte. It is still the better tool where the learned wall is blind (see
+"What the wall cannot see" above).
 
 1. **Locate** each stone at the minima of the color-gradient field
    (brightness thresholds are half-blind — dark stones read as grout —
@@ -43,9 +101,15 @@ to fine-tune, every result reproducible to the byte.
 
 ```
 pip install -r requirements.txt
-bin/survey examples/alexander-detail.jpg -o alexander --crop 0.15,0.10,0.85,0.55
+bin/survey examples/alexander-detail.jpg -o alexander --crop 0.15,0.10,0.85,0.55 --learned
+bin/survey examples/alexander-detail.jpg -o alexander --crop 0.15,0.10,0.85,0.55   # the classic mold
 pytest tests/ -v
 ```
+
+With cellpose installed (`pip install cellpose`), add `--model auto` to
+place the points with its stock weights, or `--model PATH` for fine-tuned
+ones; the surveys in this README used weights fine-tuned on the Gorgon's
+verified outlines.
 
 Four files come out:
 
@@ -103,63 +167,6 @@ Four files come out:
 counter-clockwise. `wall` is the color-delta tolerance the stone grew
 with; a cramped wall (`near_grout: true`) marks stones that sat close to
 the grout color and may be over-split.
-
-## The learned wall (`--learned`)
-
-The mold's stopping rule is one line: grow while the color delta stays
-under a hand-tuned wall. `--learned` replaces that line with a rule the
-floor taught, and splits the survey into the three questions it always
-contained:
-
-1. **Identify** — one interior point per stone. A cell-segmentation model
-   places the points if you have one (`--model auto` for cellpose's stock
-   weights, `--model PATH` for fine-tuned ones); without it, the gradient
-   minima the mold uses, gated by the grout color so a point in mortar
-   never grows mortar.
-2. **Spread** — every stone grows from its point, all together, one ring
-   per round, and a small network decides each candidate pixel from the
-   stone's own point of view: six luminance samples along the outward
-   normal relative to the stone's core, the core delta, and the gradient.
-   Eight numbers in, 833 parameters, trained on human-verified outlines.
-3. **Boundary** — where two pale stones collide, a second network reads
-   the corridor between them from *both* sides (the ridge profile along
-   the line joining the two cores) and releases what is mortar. A
-   one-sided rule is weakest exactly there: measured at those collisions
-   on held-out stones, the wall alone scores 0.67 and the two-sided read
-   0.88.
-
-There is no closure step. Ground the wall refused stays refused, and what
-it calls mortar is the record's mortar.
-
-![Verified outlines on the Gorgon medallion](examples/learned-wall-verdicts.jpg)
-
-*The training loop, made visible: 529 learned-wall outlines on a
-860×645 region of the Gorgon medallion, each judged by eye in a purpose-
-built annotator — green passed, the rest are the faults by kind. The
-passes train the next wall; the merged and trailing stones, almost all
-of them white on white, are the open problem. The stones were located by
-a cellpose model fine-tuned on the previous round's passes, so the two
-halves train each other and a human judges every turn.*
-
-```
-bin/survey photo.jpg -o out --learned                       # points from the gradient field
-bin/survey photo.jpg -o out --learned --model auto --gpu    # points from cellpose
-```
-
-Inference needs only numpy, scipy and Pillow — the weights ship in
-`models/` as `.npz` (9 KB and 7 KB). Training needs scikit-learn and a
-verdicts file (`surveyor/learn.py PHOTO STONES.json VERDICTS.json`);
-the fine-tuned cellpose weights are not in this repository (1.2 GB).
-
-**What the wall cannot see, stated plainly.** It reads luminance, and it
-learned on stone against a mortar *brighter* than the stone — the pale
-lime mortar of the floors it was trained on. A joint darker than its
-stones, or one that differs from them in hue alone, is invisible to it;
-the mold's max-channel wall sees both, so use the mold there. And its
-look-ahead is five pixels: on a photograph where a tessera is five pixels
-across, it has nothing to look at (see the Tiberias segment in the
-gallery). Each stone carries `"source": "model"` or `"field"` so you know
-who placed its point.
 
 ## Honesty as a design rule
 
@@ -237,10 +244,11 @@ Known limitations — is what the first three items below break through:)
 
 ## Gallery
 
-More floors — a Roman partridge through a Tiberias synagogue
-segment, plus the Alexander Mosaic with its damage-tiling failure visible
-— in [examples/GALLERY.md](examples/GALLERY.md), with sources and
-licenses in [examples/PROVENANCE.md](examples/PROVENANCE.md).
+Six floors through the learned wall — a Roman partridge, a centaur, the
+Alexander Mosaic, and the Tiberias segment where the wall's resolution
+runs out — with the classic mold's count beside each, in
+[examples/GALLERY.md](examples/GALLERY.md); sources and licenses in
+[examples/PROVENANCE.md](examples/PROVENANCE.md).
 
 ## Provenance
 
